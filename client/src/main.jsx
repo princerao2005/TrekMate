@@ -18,7 +18,10 @@ function MarkdownView({content,className=''}){
   return <div className={`markdown-body-custom ${className}`} dangerouslySetInnerHTML={{__html:cleanHtml}}/>;
 }
 ChartJS.register(CategoryScale,LinearScale,BarElement,ArcElement,Tooltip,Legend);
-const api=axios.create({baseURL:'/api'});
+const apiBase = import.meta.env.VITE_API_URL 
+  ? (import.meta.env.VITE_API_URL.endsWith('/api') ? import.meta.env.VITE_API_URL : `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api`)
+  : '/api';
+const api=axios.create({baseURL:apiBase});
 api.interceptors.request.use(c=>{const t=localStorage.getItem('trek-token');if(t)c.headers.Authorization=`Bearer ${t}`;return c;});
 const imageFor=t=>t?.imageUrl||'/static/uploads/everest-base-camp.jpg';
 function useSession(){const [user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem('trek-user'))}catch{return null}});return {user,setUser};}

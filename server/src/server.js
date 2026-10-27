@@ -11,23 +11,26 @@ import bcrypt from 'bcryptjs';
 import dns from "node:dns";
 
 dns.setServers(["8.8.8.8"]);
+import fs from 'fs';
 dotenv.config();
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === 'production';
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.resolve(__dirname, '../../client/public/static/uploads')));
 app.get('/api/health', (_req,res)=>res.json({ok:true,service:'trekking-management-api'}));
 app.use('/api', api);
 
-// In production, serve the Vite-built client and let React Router handle routing
-if (isProd) {
-  const clientDist = path.resolve(__dirname, '../../client/dist');
+// In production, serve the Vite-built client if present; otherwise provide a status endpoint
+const clientDist = path.resolve(__dirname, '../../client/dist');
+if (isProd && fs.existsSync(path.join(clientDist, 'index.html'))) {
   app.use(express.static(clientDist));
   app.get('*', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+} else {
+  app.get('/', (_req, res) => res.json({ ok: true, service: 'trekking-management-api', status: 'ready' }));
 }
 
 const port = process.env.PORT || 5000;
