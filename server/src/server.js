@@ -36,7 +36,9 @@ try {
   const legacyTreks = await Trek.find({
     $or: [
       { imageFilename: /^https?:\/\//i },
-      { imageUrl: /^https?:\/\/images\.unsplash\.com\//i }
+      { imageUrl: /^https?:\/\/images\.unsplash\.com\//i },
+      // Corrupted: "/static/uploads/https://..." — embedded external URL
+      { imageUrl: /^\/static\/uploads\/https?:\/\//i }
     ]
   }).select('_id region').lean();
   if (legacyTreks.length) {

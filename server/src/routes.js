@@ -52,8 +52,18 @@ function allow(...roles){return async(req,res,next)=>{try{
  req.user=user;next();
  }catch(e){res.status(500).json({message:e.message});}}}
 const safeTrek=t=>{
+ // A valid imageUrl is either a Cloudinary URL (https://res.cloudinary.com/...) or a local /static/... path
+ // Corrupted entries look like: "/static/uploads/https://..." — detect and reject them
+ const isValidImageUrl=url=>{
+  if(!url)return false;
+  // Local path starting with /static/ or / (but NOT containing an embedded http)
+  if(url.startsWith('/static/')&&!/^\/static\/uploads\/https?:\/\//i.test(url))return true;
+  // Cloudinary URLs
+  if(/^https?:\/\/res\.cloudinary\.com\//i.test(url))return true;
+  return false;
+ };
  const legacyFilename=t.imageFilename&&!/^https?:\/\//i.test(t.imageFilename)?`/static/uploads/${t.imageFilename}`:'';
- const imageUrl=t.imageUrl&&!/^https?:\/\/images\.unsplash\.com\//i.test(t.imageUrl)?t.imageUrl:legacyFilename||`/static/uploads/${getTrekImageFilename(t.region||'Nepal')}`;
+ const imageUrl=isValidImageUrl(t.imageUrl)?t.imageUrl:legacyFilename||`/static/uploads/${getTrekImageFilename(t.region||'Nepal')}`;
  return {...t.toObject(),id:t._id,assignedStaffId:t.assignedStaff?._id||t.assignedStaff||null,assignedStaffName:t.assignedStaff?.name||null,imageUrl};
 };
 const populateTrek='assignedStaff';

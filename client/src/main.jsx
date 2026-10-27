@@ -87,39 +87,52 @@ function TrekBrowse({notify,admin=false}){
     {name:'China',image:'/static/uploads/great-wall-china.jpg'},
   ];
 
-  async function load(){
+  const load=React.useCallback(async()=>{
     setLoading(true);
     try{
       const params=admin?{}:{public:'true'};
+      // Send difficulty and region to the API for server-side filtering
       if(difficulty)params.difficulty=difficulty;
       if(selectedRegion)params.region=selectedRegion;
       const r=await api.get('/treks',{params});
       let data=[...r.data];
+
+      // Client-side: search filter (name or region)
       if(search){
         const s=search.toLowerCase();
-        data=data.filter(t=>`${t.name} ${t.region||''} ${t.id}`.toLowerCase().includes(s));
+        data=data.filter(t=>`${t.name} ${t.region||''}`.toLowerCase().includes(s));
       }
+
+      // Client-side: duration/timespan filter
       if(timespan==='1-3')data=data.filter(t=>t.duration>=1&&t.duration<=3);
       else if(timespan==='4-7')data=data.filter(t=>t.duration>=4&&t.duration<=7);
       else if(timespan==='8+')data=data.filter(t=>t.duration>=8);
+
+      // Client-side: date filter — show treks whose startDate is ON or AFTER the chosen date
       if(startDate){
-        const selStart=new Date(`${startDate}T00:00:00`).getTime();
-        const selEnd=new Date(`${startDate}T23:59:59.999`).getTime();
         data=data.filter(t=>{
           if(!t.startDate)return false;
-          const start=new Date(t.startDate).getTime();
-          const end=t.endDate?new Date(t.endDate).getTime():start+((t.duration||1)*86400000);
-          return start<=selEnd&&end>=selStart;
+          const trekStart=t.startDate.slice(0,10); // "YYYY-MM-DD"
+          return trekStart>=startDate;
         });
       }
+
+      // Sorting
       if(sortBy==='price-desc')data.sort((a,b)=>(b.price||0)-(a.price||0));
-      else data.sort((a,b)=>(a.price||0)-(b.price||0));
+      else if(sortBy==='date-asc')data.sort((a,b)=>new Date(a.startDate)-new Date(b.startDate));
+      else if(sortBy==='date-desc')data.sort((a,b)=>new Date(b.startDate)-new Date(a.startDate));
+      else data.sort((a,b)=>(a.price||0)-(b.price||0)); // price-asc default
+
       setTreks(data);
     }catch(e){notify(e.response?.data?.message||'Could not load treks.','danger')}
     finally{setLoading(false)}
-  }
+  },[selectedRegion,difficulty,timespan,startDate,sortBy,search,admin,notify]);
 
-  useEffect(()=>{load()},[selectedRegion,difficulty,timespan,startDate,sortBy,search]);
+  // Debounce search so we don't fire an API call on every keystroke
+  useEffect(()=>{
+    const t=setTimeout(()=>load(),search?350:0);
+    return()=>clearTimeout(t);
+  },[load]);
   useEffect(()=>{saveFilters({search,difficulty,timespan,selectedRegion,startDate,sortBy})},[search,difficulty,timespan,selectedRegion,startDate,sortBy]);
 
   function clearAll(){setDifficulty('');setTimespan('');setSelectedRegion('');setStartDate('');setSortBy('price-asc');setSearch('');try{sessionStorage.removeItem(FILTER_KEY)}catch{}}
@@ -190,11 +203,11 @@ function TrekBrowse({notify,admin=false}){
             </button>
           )}
 
-          {/* Calendar / When */}
+          {/* Calendar / Starting From */}
           <div className="sidebar-block">
             <div className="sidebar-section-header">
               <span className="sidebar-block-label">
-                <i className="bi bi-calendar-event"/> When
+                <i className="bi bi-calendar-event"/> Starting From
               </span>
               {startDate&&(
                 <button type="button" className="sidebar-sec-clear" onClick={()=>setStartDate('')} title="Clear date filter">
@@ -203,6 +216,7 @@ function TrekBrowse({notify,admin=false}){
               )}
             </div>
             <div className="sidebar-block-body">
+              <small className="text-secondary d-block mb-1" style={{fontSize:'0.72rem'}}>Shows treks starting on or after this date</small>
               <input
                 type="date"
                 className="form-control sidebar-date-input"
@@ -306,6 +320,8 @@ function TrekBrowse({notify,admin=false}){
               >
                 <option value="price-asc">Price: Low → High</option>
                 <option value="price-desc">Price: High → Low</option>
+                <option value="date-asc">Date: Earliest first</option>
+                <option value="date-desc">Date: Latest first</option>
               </select>
             </div>
           </div>
